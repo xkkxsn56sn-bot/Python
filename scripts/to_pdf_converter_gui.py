@@ -15,7 +15,8 @@ class ToPDFConverterGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Batch Converter to PDF")
-        self.root.geometry("960x760")
+        self.root.geometry("1180x900")
+        self.root.minsize(1040, 820)
         self.root.resizable(True, True)
 
         self.input_path = tk.StringVar()
@@ -46,14 +47,21 @@ class ToPDFConverterGUI:
         except tk.TclError:
             pass
 
+        default_label = tk.Label(self.root)
+        self.default_text_color = default_label.cget("fg")
+        default_label.destroy()
+        self.default_background_color = self.root.cget("bg")
+
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
         main_frame = ttk.Frame(self.root, padding=12)
         main_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+        main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(2, weight=1)
+        main_frame.columnconfigure(3, weight=1)
         main_frame.rowconfigure(4, weight=1)
-        main_frame.rowconfigure(5, weight=1)
 
         title = ttk.Label(main_frame, text="Batch Converter to PDF", font=("Helvetica", 17, "bold"))
         title.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 6))
@@ -81,12 +89,42 @@ class ToPDFConverterGUI:
         ttk.Entry(output_frame, textvariable=self.output_dir).grid(row=0, column=0, sticky=(tk.E, tk.W), padx=(0, 6))
         ttk.Button(output_frame, text="Sfoglia", command=self.browse_output).grid(row=0, column=1)
 
-        options_frame = ttk.LabelFrame(main_frame, text="Opzioni", padding=10)
-        options_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.N, tk.S, tk.E, tk.W), pady=5, padx=(0, 6))
+        content_pane = ttk.Panedwindow(main_frame, orient=tk.VERTICAL)
+        content_pane.grid(row=4, column=0, columnspan=4, sticky=(tk.N, tk.S, tk.E, tk.W), pady=5)
+
+        top_frame = ttk.Frame(content_pane)
+        bottom_frame = ttk.Frame(content_pane)
+        top_frame.columnconfigure(0, weight=1)
+        top_frame.rowconfigure(0, weight=1)
+        bottom_frame.columnconfigure(0, weight=1)
+        bottom_frame.rowconfigure(0, weight=1)
+
+        content_pane.add(top_frame, weight=3)
+        content_pane.add(bottom_frame, weight=2)
+
+        top_pane = ttk.Panedwindow(top_frame, orient=tk.HORIZONTAL)
+        top_pane.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+
+        options_container = ttk.Frame(top_pane)
+        right_frame = ttk.Frame(top_pane)
+        options_container.columnconfigure(0, weight=1)
+        options_container.rowconfigure(0, weight=1)
+        right_frame.columnconfigure(0, weight=1)
+        right_frame.rowconfigure(0, weight=3, minsize=260)
+        right_frame.rowconfigure(1, weight=1, minsize=120)
+
+        top_pane.add(options_container, weight=2)
+        top_pane.add(right_frame, weight=3)
+
+        options_frame = ttk.LabelFrame(options_container, text="Opzioni", padding=10)
+        options_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W), padx=(0, 6))
         options_frame.columnconfigure(1, weight=1)
 
         preset_frame = ttk.LabelFrame(options_frame, text="Preset", padding=8)
         preset_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.E, tk.W), pady=(0, 10))
+        preset_frame.columnconfigure(0, weight=1)
+        preset_frame.columnconfigure(1, weight=1)
+        preset_frame.columnconfigure(2, weight=1)
         ttk.Radiobutton(
             preset_frame,
             text="Bilanciato",
@@ -108,8 +146,25 @@ class ToPDFConverterGUI:
             variable=self.preset,
             command=self.apply_selected_preset,
         ).grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
-        self.preset_hint = ttk.Label(preset_frame, text="", foreground="gray")
-        self.preset_hint.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(6, 0))
+
+        self.preset_hint_container = tk.Frame(preset_frame, bg=self.default_background_color, highlightthickness=0, bd=0)
+        self.preset_hint_container.grid(row=1, column=0, columnspan=3, sticky=(tk.E, tk.W), pady=(8, 0))
+        self.preset_hint_container.grid_columnconfigure(0, weight=1)
+
+        self.preset_hint = tk.Label(
+            self.preset_hint_container,
+            text="",
+            fg=self.default_text_color,
+            bg=self.default_background_color,
+            font=("Helvetica", 11),
+            justify=tk.LEFT,
+            wraplength=520,
+            anchor="w",
+            padx=0,
+            pady=0,
+        )
+        self.preset_hint.grid(row=0, column=0, sticky=(tk.E, tk.W))
+        self.preset_hint_container.bind("<Configure>", self.on_preset_hint_resize)
 
         ttk.Checkbutton(options_frame, text="Ricorsivo", variable=self.recursive).grid(row=1, column=0, sticky=tk.W)
         ttk.Checkbutton(options_frame, text="Sovrascrivi PDF esistenti", variable=self.overwrite).grid(row=2, column=0, sticky=tk.W)
@@ -127,12 +182,12 @@ class ToPDFConverterGUI:
         ttk.Label(options_frame, text="Report JSON").grid(row=8, column=0, sticky=tk.W, pady=(8, 0))
         ttk.Entry(options_frame, textvariable=self.report_name).grid(row=8, column=1, sticky=(tk.E, tk.W), pady=(8, 0))
 
-        files_frame = ttk.LabelFrame(main_frame, text="File trovati", padding=10)
-        files_frame.grid(row=4, column=2, columnspan=2, sticky=(tk.N, tk.S, tk.E, tk.W), pady=5)
+        files_frame = ttk.LabelFrame(right_frame, text="File trovati", padding=10)
+        files_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W), pady=(0, 5))
         files_frame.columnconfigure(0, weight=1)
         files_frame.rowconfigure(0, weight=1)
 
-        self.file_tree = ttk.Treeview(files_frame, columns=("folder", "type"), height=14)
+        self.file_tree = ttk.Treeview(files_frame, columns=("folder", "type"), height=16)
         self.file_tree.heading("#0", text="Nome file")
         self.file_tree.heading("folder", text="Cartella")
         self.file_tree.heading("type", text="Tipo")
@@ -145,12 +200,12 @@ class ToPDFConverterGUI:
         files_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.file_tree.configure(yscrollcommand=files_scroll.set)
 
-        failures_frame = ttk.LabelFrame(main_frame, text="File falliti", padding=10)
-        failures_frame.grid(row=5, column=2, columnspan=2, sticky=(tk.N, tk.S, tk.E, tk.W), pady=5)
+        failures_frame = ttk.LabelFrame(right_frame, text="File falliti", padding=10)
+        failures_frame.grid(row=1, column=0, sticky=(tk.N, tk.S, tk.E, tk.W), pady=(5, 0))
         failures_frame.columnconfigure(0, weight=1)
         failures_frame.rowconfigure(0, weight=1)
 
-        self.failure_tree = ttk.Treeview(failures_frame, columns=("type", "reason"), height=8)
+        self.failure_tree = ttk.Treeview(failures_frame, columns=("type", "reason"), height=5)
         self.failure_tree.heading("#0", text="File")
         self.failure_tree.heading("type", text="Tipo")
         self.failure_tree.heading("reason", text="Errore")
@@ -163,8 +218,8 @@ class ToPDFConverterGUI:
         failures_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.failure_tree.configure(yscrollcommand=failures_scroll.set)
 
-        log_frame = ttk.LabelFrame(main_frame, text="Log conversione", padding=10)
-        log_frame.grid(row=6, column=0, columnspan=4, sticky=(tk.N, tk.S, tk.E, tk.W), pady=5)
+        log_frame = ttk.LabelFrame(bottom_frame, text="Log conversione", padding=10)
+        log_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
 
@@ -172,7 +227,7 @@ class ToPDFConverterGUI:
         self.log_text.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
 
         progress_frame = ttk.Frame(main_frame)
-        progress_frame.grid(row=7, column=0, columnspan=4, sticky=(tk.E, tk.W), pady=(8, 0))
+        progress_frame.grid(row=5, column=0, columnspan=4, sticky=(tk.E, tk.W), pady=(8, 0))
         progress_frame.columnconfigure(0, weight=1)
 
         self.progress_var = tk.DoubleVar(value=0)
@@ -183,7 +238,7 @@ class ToPDFConverterGUI:
         self.status_label.grid(row=1, column=0, sticky=tk.W, pady=(4, 0))
 
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=8, column=0, columnspan=4, pady=(12, 0), sticky=tk.W)
+        button_frame.grid(row=6, column=0, columnspan=4, pady=(12, 0), sticky=tk.W)
 
         self.start_button = ttk.Button(button_frame, text="Avvia conversione", command=self.start_conversion)
         self.start_button.grid(row=0, column=0)
@@ -192,12 +247,20 @@ class ToPDFConverterGUI:
         ttk.Button(button_frame, text="Pulisci log", command=self.clear_log).grid(row=0, column=3, padx=(8, 0))
         ttk.Button(button_frame, text="Esci", command=self.root.quit).grid(row=0, column=4, padx=(8, 0))
 
+        # Keep the options and files sections visible by default while allowing manual resize.
+        self.root.after(200, lambda: content_pane.sashpos(0, 460))
+        self.root.after(250, lambda: top_pane.sashpos(0, 470))
+
         self.apply_selected_preset()
         self.log("Pronto. Seleziona un file o una cartella e avvia la scansione.")
 
     def clear_failure_list(self) -> None:
         for item in self.failure_tree.get_children():
             self.failure_tree.delete(item)
+
+    def on_preset_hint_resize(self, event: tk.Event) -> None:
+        wraplength = max(event.width - 4, 220)
+        self.preset_hint.config(wraplength=wraplength)
 
     def populate_failure_list(self) -> None:
         self.clear_failure_list()
@@ -263,7 +326,12 @@ class ToPDFConverterGUI:
             self.pdf_engine.set("xelatex")
             self.toc.set(False)
             self.number_sections.set(False)
-            self.preset_hint.config(text="Qualita stampa: privilegia Pandoc con xelatex per una resa tipografica piu stabile.")
+            self.preset_hint.config(
+                text=(
+                    "Qualita stampa: privilegia Pandoc con xelatex\n"
+                    "per una resa tipografica piu stabile."
+                )
+            )
             return
 
         if preset == "fast":
@@ -271,14 +339,19 @@ class ToPDFConverterGUI:
             self.pdf_engine.set("xelatex")
             self.toc.set(False)
             self.number_sections.set(False)
-            self.preset_hint.config(text="Conversione veloce: usa LibreOffice come prima scelta quando possibile e mantiene opzioni minime.")
+            self.preset_hint.config(
+                text=(
+                    "Conversione veloce: usa LibreOffice come prima scelta\n"
+                    "quando possibile e mantiene opzioni minime."
+                )
+            )
             return
 
         self.prefer_pandoc.set(True)
         self.pdf_engine.set("xelatex")
         self.toc.set(False)
         self.number_sections.set(False)
-        self.preset_hint.config(text="Bilanciato: impostazione consigliata per uso generale.")
+        self.preset_hint.config(text="Bilanciato: impostazione consigliata\nper uso generale.")
 
     def open_output_folder(self) -> None:
         output_value = self.output_dir.get().strip()
