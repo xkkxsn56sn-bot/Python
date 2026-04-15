@@ -1,0 +1,7 @@
+# Python package used by password-protected PDF scripts.
+pypdf>=5.0.0
+
+# System tools used by various scripts (install outside pip):
+# - pandoc
+# - libreoffice
+# - xelatex (usually from MacTeX/TeX Live)

@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.vscode/
+.DS_Store
+
+# Accidental duplicate copies (e.g. "file 2.py")
+* 2.py
+* 2.txt
+* 2.md
+* 2.json
+
+# Common temporary/editor backup files
+*.tmp
+*.temp
+*.bak
+*~
