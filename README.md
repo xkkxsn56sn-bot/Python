@@ -47,10 +47,47 @@ Esegui uno script tramite chiave:
 python main.py run md_to_pdf_batch -- --help
 ```
 
+Nuovo convertitore unificato verso PDF:
+
+```bash
+python main.py run to_pdf_converter -- /percorso/input /percorso/output
+```
+
+GUI batch del convertitore:
+
+```bash
+python main.py run to_pdf_converter_gui
+```
+
+Esempi:
+
+```bash
+# Converte tutti i file supportati in una cartella, incluse sottocartelle
+python main.py run to_pdf_converter -- ~/Documenti/input ~/Documenti/output_pdf
+
+# Usa Pandoc per Markdown ed EPUB
+python main.py run to_pdf_converter -- ~/Documenti/input ~/Documenti/output_pdf --prefer-pandoc
+
+# Converte un singolo file DOCX
+python main.py run to_pdf_converter -- ~/Documenti/file.docx ~/Documenti/output_pdf
+
+# Apre la GUI batch per selezionare input, output e opzioni
+python main.py run to_pdf_converter_gui
+```
+
 Note:
 - Le chiavi sono generate automaticamente dai nomi file in `scripts/`.
 - In alternativa puoi passare il nome file esatto (incluso `.py`).
 - Tutti gli argomenti dopo `--` vengono inoltrati allo script scelto.
+- `to_pdf_converter` supporta: `.docx`, `.wps`, `.epub`, `.txt`, `.rtf`, `.md`.
+- `to_pdf_converter_gui` fornisce una GUI Tkinter per scansione batch, opzioni di conversione, barra di avanzamento e log.
+- La GUI include il pulsante `Apri output` per aprire la cartella di destinazione nel Finder.
+- La GUI include il pulsante `Apri report` per aprire il JSON finale generato dall'ultima conversione.
+- La GUI mostra anche una tabella `File falliti` con il motivo sintetico degli errori di conversione.
+- La GUI include i preset `Bilanciato`, `Qualita stampa` e `Conversione veloce`.
+- Per `.md` ed `.epub` serve `pandoc` con un PDF engine come `xelatex`.
+- Per `.docx`, `.wps`, `.txt` e `.rtf` serve `libreoffice` (`soffice`).
+- Su macOS il convertitore prova anche il percorso standard `/Applications/LibreOffice.app/Contents/MacOS/soffice` se `soffice` non e presente nel `PATH`.
 
 ## Task VS Code
 
