@@ -385,7 +385,8 @@ class App:
         self.protect_pdf_var = tk.BooleanVar(value=False)
         self.owner_password = tk.StringVar()
         self.user_password = tk.StringVar()
-        self.show_passwords = tk.BooleanVar(value=False)
+        self.show_owner_password = tk.BooleanVar(value=False)
+        self.show_user_password = tk.BooleanVar(value=False)
         self.allow_print = tk.BooleanVar(value=False)
         self.allow_copy = tk.BooleanVar(value=False)
         self.allow_modify = tk.BooleanVar(value=False)
@@ -456,33 +457,39 @@ class App:
         ttk.Label(sec, text="Owner password").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self.owner_password_entry = ttk.Entry(sec, textvariable=self.owner_password, show="*")
         self.owner_password_entry.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
+        self.show_owner_password_cb = ttk.Checkbutton(
+            sec,
+            text="Show",
+            variable=self.show_owner_password,
+            command=self._toggle_owner_password_visibility,
+        )
+        self.show_owner_password_cb.grid(row=1, column=2, sticky="w", padx=8, pady=4)
 
         ttk.Label(sec, text="User password (optional)").grid(row=2, column=0, sticky="w", padx=8, pady=4)
         self.user_password_entry = ttk.Entry(sec, textvariable=self.user_password, show="*")
         self.user_password_entry.grid(row=2, column=1, sticky="ew", padx=8, pady=4)
-
-        self.show_passwords_cb = ttk.Checkbutton(
+        self.show_user_password_cb = ttk.Checkbutton(
             sec,
-            text="Show owner and user passwords",
-            variable=self.show_passwords,
-            command=self._toggle_password_visibility,
+            text="Show",
+            variable=self.show_user_password,
+            command=self._toggle_user_password_visibility,
         )
-        self.show_passwords_cb.grid(row=3, column=0, columnspan=2, sticky="w", padx=8, pady=4)
+        self.show_user_password_cb.grid(row=2, column=2, sticky="w", padx=8, pady=4)
 
         self.allow_print_cb = ttk.Checkbutton(sec, text="Allow print", variable=self.allow_print)
-        self.allow_print_cb.grid(row=4, column=0, sticky="w", padx=8, pady=4)
+        self.allow_print_cb.grid(row=3, column=0, sticky="w", padx=8, pady=4)
 
         self.allow_copy_cb = ttk.Checkbutton(sec, text="Allow copy/extract", variable=self.allow_copy)
-        self.allow_copy_cb.grid(row=4, column=1, sticky="w", padx=8, pady=4)
+        self.allow_copy_cb.grid(row=3, column=1, sticky="w", padx=8, pady=4)
 
         self.allow_modify_cb = ttk.Checkbutton(sec, text="Allow modify", variable=self.allow_modify)
-        self.allow_modify_cb.grid(row=5, column=0, sticky="w", padx=8, pady=4)
+        self.allow_modify_cb.grid(row=4, column=0, sticky="w", padx=8, pady=4)
 
         self.protection_note = ttk.Label(
             sec,
             text="Default behavior blocks print, copy, and modify. Owner password is required."
         )
-        self.protection_note.grid(row=5, column=1, sticky="w", padx=8, pady=4)
+        self.protection_note.grid(row=4, column=1, columnspan=2, sticky="w", padx=8, pady=4)
         sec.columnconfigure(1, weight=1)
 
         row += 1
@@ -513,9 +520,12 @@ class App:
         scrollbar.grid(row=row, column=3, sticky="ns")
         self.log.configure(yscrollcommand=scrollbar.set)
 
-    def _toggle_password_visibility(self):
-        show_char = "" if self.show_passwords.get() else "*"
+    def _toggle_owner_password_visibility(self):
+        show_char = "" if self.show_owner_password.get() else "*"
         self.owner_password_entry.configure(show=show_char)
+
+    def _toggle_user_password_visibility(self):
+        show_char = "" if self.show_user_password.get() else "*"
         self.user_password_entry.configure(show=show_char)
 
     def _toggle_protection_fields(self):
@@ -523,7 +533,8 @@ class App:
         widgets = [
             self.owner_password_entry,
             self.user_password_entry,
-            self.show_passwords_cb,
+            self.show_owner_password_cb,
+            self.show_user_password_cb,
             self.allow_print_cb,
             self.allow_copy_cb,
             self.allow_modify_cb,
