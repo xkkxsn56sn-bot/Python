@@ -30,6 +30,29 @@ class Segment:
     warnings: str = ""
 
 
+DEEPL_SOURCE_LANGS = {
+    "Italian":   "IT",
+    "French":    "FR",
+    "English":   "EN",
+    "German":    "DE",
+    "Danish":    "DA",
+    "Swedish":   "SV",
+    "Norwegian": "NB",
+    "Icelandic": "IS",
+}
+
+DEEPL_TARGET_LANGS = {
+    "Italian":   "IT",
+    "French":    "FR",
+    "English":   "EN-GB",
+    "German":    "DE",
+    "Danish":    "DA",
+    "Swedish":   "SV",
+    "Norwegian": "NB",
+    "Icelandic": "IS",
+}
+
+
 class DeepLClient:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("DEEPL_API_KEY", "")
@@ -199,34 +222,42 @@ class MarkdownHybridEngine:
             out = re.sub(rf"\b{re.escape(us)}\b", uk, out, flags=re.IGNORECASE)
         return out
 
-    def build_context(self, segment: Segment) -> str:
+    def build_context(self, segment: Segment, source_lang: str = "IT", target_lang: str = "EN-GB") -> str:
+        _LANG_NAMES = {
+            "IT": "Italian", "FR": "French", "EN": "English", "EN-GB": "English",
+            "EN-US": "English", "DE": "German", "DA": "Danish", "SV": "Swedish",
+            "NB": "Norwegian", "IS": "Icelandic",
+        }
+        src = _LANG_NAMES.get(source_lang, source_lang)
+        tgt = _LANG_NAMES.get(target_lang, target_lang)
+        extra = " Use British spelling and a refined academic register." if target_lang == "EN-GB" else ""
         return (
-            "Translate Italian Markdown into formal British English for art-historical and scholarly prose. "
-            "Preserve placeholders exactly. Preserve proper names, URLs, identifiers, shelfmarks and code. "
-            "Use British spelling and a refined academic register."
+            f"Translate {src} Markdown into formal {tgt} for scholarly prose. "
+            f"Preserve placeholders exactly. Preserve proper names, URLs, identifiers, shelfmarks and code.{extra}"
         )
 
-    def translate_segment(self, segment: Segment) -> Segment:
+    def translate_segment(self, segment: Segment, source_lang: str = "IT", target_lang: str = "EN-GB") -> Segment:
         if segment.kind in {"fence", "blank"}:
             segment.target = segment.source
             segment.status = "protected"
             return segment
 
         protected, mapping = self.protect(segment.source)
-        prepared = self.apply_glossary(protected)
+        prepared = self.apply_glossary(protected) if source_lang == "IT" else protected
         translated = self.deepl.translate_text(
             prepared,
-            source_lang="IT",
-            target_lang="EN-GB",
-            context=self.build_context(segment)
+            source_lang=source_lang,
+            target_lang=target_lang,
+            context=self.build_context(segment, source_lang, target_lang)
         )
-        translated = self.normalise_british(translated)
+        if target_lang == "EN-GB":
+            translated = self.normalise_british(translated)
         translated = self.restore(translated, mapping)
 
         segment.target = translated
         segment.status = "translated"
 
-        if re.search(r"\b(il|lo|la|gli|della|delle|degli|nel|nella|con|per)\b", translated, re.IGNORECASE):
+        if source_lang == "IT" and re.search(r"\b(il|lo|la|gli|della|delle|degli|nel|nella|con|per)\b", translated, re.IGNORECASE):
             segment.warnings = "Possible Italian residue"
 
         return segment
@@ -238,14 +269,13 @@ class MarkdownHybridEngine:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hybrid Markdown Translator — DeepL en-GB")
+        self.setWindowTitle("Hybrid Markdown Translator — DeepL")
         self.resize(1500, 920)
 
         self.deepl = DeepLClient()
         self.engine = MarkdownHybridEngine(self.deepl)
 
         self.project_dir = ""
-        self.output_dir = ""
         self.files: List[str] = []
         self.current_segments: List[Segment] = []
         self.current_file = None
@@ -261,6 +291,11 @@ class MainWindow(QMainWindow):
         self.btn_translate_all = QPushButton("Batch Translate")
         self.btn_export = QPushButton("Export Current")
         self.btn_export_all = QPushButton("Export All")
+        self.source_lang_combo = QComboBox()
+        self.source_lang_combo.addItems(list(DEEPL_SOURCE_LANGS.keys()))
+        self.target_lang_combo = QComboBox()
+        self.target_lang_combo.addItems(list(DEEPL_TARGET_LANGS.keys()))
+        self.target_lang_combo.setCurrentText("English")
         self.filter_status = QComboBox()
         self.filter_status.addItems(["all", "new", "translated", "edited", "approved", "flagged", "protected"])
         self.search_box = QLineEdit()
@@ -269,6 +304,7 @@ class MainWindow(QMainWindow):
         for w in [
             self.btn_open, self.btn_set_key, self.btn_translate_file,
             self.btn_translate_all, self.btn_export, self.btn_export_all,
+            QLabel("From:"), self.source_lang_combo, QLabel("To:"), self.target_lang_combo,
             QLabel("Filter:"), self.filter_status, self.search_box
         ]:
             topbar.addWidget(w)
@@ -296,8 +332,8 @@ class MainWindow(QMainWindow):
         editors = QSplitter(Qt.Horizontal)
         self.source_editor = QTextEdit()
         self.target_editor = QTextEdit()
-        self.source_editor.setPlaceholderText("Italian source segment")
-        self.target_editor.setPlaceholderText("British English target segment")
+        self.source_editor.setPlaceholderText("Source segment")
+        self.target_editor.setPlaceholderText("Target segment")
         editors.addWidget(self.source_editor)
         editors.addWidget(self.target_editor)
         center_layout.addWidget(editors)
@@ -347,6 +383,16 @@ class MainWindow(QMainWindow):
     def format_glossary(self) -> str:
         return "\n".join(f"{k} -> {v}" for k, v in self.engine.TERM_MAP.items())
 
+    def get_source_lang(self) -> str:
+        return DEEPL_SOURCE_LANGS[self.source_lang_combo.currentText()]
+
+    def get_target_lang(self) -> str:
+        return DEEPL_TARGET_LANGS[self.target_lang_combo.currentText()]
+
+    def _get_output_dir(self) -> str:
+        suffix = self.get_target_lang().lower().replace("-", "_")
+        return os.path.join(self.project_dir, f"translated_{suffix}")
+
     def update_api_label(self):
         if self.deepl.is_configured():
             key = self.deepl.api_key
@@ -367,8 +413,6 @@ class MainWindow(QMainWindow):
         if not folder:
             return
         self.project_dir = folder
-        self.output_dir = os.path.join(folder, "translated_en_GB")
-        os.makedirs(self.output_dir, exist_ok=True)
         self.files = [f for f in os.listdir(folder) if f.lower().endswith(".md")]
         self.files.sort()
         self.refresh_file_list()
@@ -424,8 +468,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "DeepL", "Please set your DeepL API key first.")
             return
 
+        src = self.get_source_lang()
+        tgt = self.get_target_lang()
         try:
-            self.current_segments = [self.engine.translate_segment(seg) for seg in self.current_segments]
+            self.current_segments = [self.engine.translate_segment(seg, src, tgt) for seg in self.current_segments]
             self.populate_segments()
             self.status_label.setText("Current file translated with DeepL")
         except Exception as e:
@@ -438,6 +484,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "DeepL", "Please set your DeepL API key first.")
             return
 
+        src = self.get_source_lang()
+        tgt = self.get_target_lang()
+        output_dir = self._get_output_dir()
+        os.makedirs(output_dir, exist_ok=True)
+        suffix = tgt.lower().replace("-", "_")
         count = 0
         try:
             for fname in self.files:
@@ -446,16 +497,16 @@ class MainWindow(QMainWindow):
                     text = fh.read()
 
                 segments = self.engine.parse_markdown(text)
-                segments = [self.engine.translate_segment(seg) for seg in segments]
+                segments = [self.engine.translate_segment(seg, src, tgt) for seg in segments]
                 output = self.engine.rebuild(segments)
 
-                outpath = os.path.join(self.output_dir, fname.replace(".md", "_en-GB.md"))
+                outpath = os.path.join(output_dir, fname.replace(".md", f"_{suffix}.md"))
                 with open(outpath, "w", encoding="utf-8") as fh:
                     fh.write(output)
 
                 count += 1
 
-            QMessageBox.information(self, "Done", f"Batch translated {count} files into {self.output_dir}")
+            QMessageBox.information(self, "Done", f"Batch translated {count} files into {output_dir}")
         except Exception as e:
             QMessageBox.critical(self, "Batch translation error", str(e))
 
@@ -494,10 +545,12 @@ class MainWindow(QMainWindow):
         if not self.current_file or not self.current_segments:
             return
 
-        os.makedirs(self.output_dir, exist_ok=True)
+        output_dir = self._get_output_dir()
+        os.makedirs(output_dir, exist_ok=True)
+        suffix = self.get_target_lang().lower().replace("-", "_")
         output = self.engine.rebuild(self.current_segments)
-        fname = os.path.basename(self.current_file).replace(".md", "_en-GB.md")
-        outpath = os.path.join(self.output_dir, fname)
+        fname = os.path.basename(self.current_file).replace(".md", f"_{suffix}.md")
+        outpath = os.path.join(output_dir, fname)
 
         with open(outpath, "w", encoding="utf-8") as fh:
             fh.write(output)
