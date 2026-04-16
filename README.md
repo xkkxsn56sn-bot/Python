@@ -59,6 +59,16 @@ GUI batch del convertitore:
 python main.py run to_pdf_converter_gui
 ```
 
+Misura distanza Terra-Luna giorno per giorno:
+
+```bash
+python main.py run earth_moon_distance_daily
+python main.py run earth_moon_distance_daily -- --start-date 2026-04-16 --days 90 --time-utc 12:00 --output ~/Desktop/earth_moon_distance.csv
+python main.py run earth_moon_distance_daily -- --plot --plot-output ~/Desktop/earth_moon_distance.png
+python main.py run earth_moon_distance_daily -- --append-daily --start-date 2026-04-16
+python main.py run earth_moon_distance_daily -- --gui
+```
+
 Esempi:
 
 ```bash
@@ -81,6 +91,10 @@ Note:
 - Tutti gli argomenti dopo `--` vengono inoltrati allo script scelto.
 - `to_pdf_converter` supporta: `.docx`, `.wps`, `.epub`, `.txt`, `.rtf`, `.md`.
 - `to_pdf_converter_gui` fornisce una GUI Tkinter per scansione batch, opzioni di conversione, barra di avanzamento e log.
+- `earth_moon_distance_daily` calcola la distanza geocentrica Terra-Luna usando effemeridi JPL (`de421`) e salva un CSV giornaliero.
+- `earth_moon_distance_daily --plot` genera anche un grafico PNG dell'andamento della distanza.
+- `earth_moon_distance_daily --append-daily` aggiunge una sola riga al CSV per la data scelta (salta i duplicati).
+- `earth_moon_distance_daily --gui` apre una GUI desktop (Tkinter) con campi input/output e opzioni plot/append.
 - La GUI include il pulsante `Apri output` per aprire la cartella di destinazione nel Finder.
 - La GUI include il pulsante `Apri report` per aprire il JSON finale generato dall'ultima conversione.
 - La GUI mostra anche una tabella `File falliti` con il motivo sintetico degli errori di conversione.

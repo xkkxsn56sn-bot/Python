@@ -1,6 +1,12 @@
 # Python package used by password-protected PDF scripts.
 pypdf>=5.0.0
 
+# Astronomy calculations for Earth-Moon daily distance script.
+skyfield>=1.49
+
+# Optional chart generation for Earth-Moon distance script.
+matplotlib>=3.8.0
+
 # System tools used by various scripts (install outside pip):
 # - pandoc
 # - libreoffice
