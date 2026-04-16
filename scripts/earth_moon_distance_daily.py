@@ -195,7 +195,7 @@ def append_csv(rows: Iterable[DistanceRow], output_path: Path) -> int:
     return appended
 
 
-def create_plot(rows: list[DistanceRow], plot_output: Path, max_ticks: int = 10) -> None:
+def create_plot(rows: list[DistanceRow], plot_output: Path, utc_time: time, max_ticks: int = 10) -> None:
     try:
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
@@ -205,10 +205,10 @@ def create_plot(rows: list[DistanceRow], plot_output: Path, max_ticks: int = 10)
     plot_output.parent.mkdir(parents=True, exist_ok=True)
     dates = [datetime.combine(row.day, time.min) for row in rows]
     distances = [row.distance_km for row in rows]
-    moon_x = [row.x_km for row in rows]
-    moon_y = [row.y_km for row in rows]
+    min_row = min(rows, key=lambda item: item.distance_km)
+    max_row = max(rows, key=lambda item: item.distance_km)
 
-    fig, (ax_distance, ax_orbit) = plt.subplots(1, 2, figsize=(14, 5))
+    fig, (ax_distance, ax_linear) = plt.subplots(1, 2, figsize=(14, 5))
     ax_distance.plot(dates, distances, marker="o", linewidth=1.4, markersize=3)
     ax_distance.set_title("Earth-Moon Distance by Day (km)")
     ax_distance.set_xlabel("Date (UTC)")
@@ -222,19 +222,65 @@ def create_plot(rows: list[DistanceRow], plot_output: Path, max_ticks: int = 10)
     ax_distance.xaxis.set_major_formatter(formatter)
     fig.autofmt_xdate(rotation=30, ha="right")
 
-    ax_orbit.plot(moon_x, moon_y, color="tab:gray", linewidth=1.0, alpha=0.85)
-    ax_orbit.scatter(moon_x, moon_y, s=10, color="tab:orange", alpha=0.75, label="Moon positions")
-    ax_orbit.scatter([0.0], [0.0], s=120, color="tab:blue", edgecolors="black", linewidths=0.8, label="Earth")
-    ax_orbit.scatter([moon_x[0]], [moon_y[0]], s=45, color="green", label="Start")
-    ax_orbit.scatter([moon_x[-1]], [moon_y[-1]], s=45, color="red", label="End")
-    ax_orbit.set_title("Geocentric XY View (Earth at center)")
-    ax_orbit.set_xlabel("X (km)")
-    ax_orbit.set_ylabel("Y (km)")
-    ax_orbit.set_aspect("equal", adjustable="box")
-    ax_orbit.grid(alpha=0.35)
-    ax_orbit.legend(loc="best", fontsize=8)
+    y_positions = list(range(len(rows)))
+    ax_linear.hlines(y_positions, xmin=0.0, xmax=distances, color="0.82", linewidth=1.0)
+    ax_linear.scatter(distances, y_positions, s=24, color="tab:orange", alpha=0.8)
+    ax_linear.scatter([0.0], [len(rows) / 2], s=140, color="tab:blue", edgecolors="black", linewidths=0.8)
 
-    fig.tight_layout()
+    start_y = y_positions[0]
+    end_y = y_positions[-1]
+    min_y = distances.index(min_row.distance_km)
+    max_y = distances.index(max_row.distance_km)
+    ax_linear.scatter([rows[0].distance_km], [start_y], s=55, color="green")
+    ax_linear.scatter([rows[-1].distance_km], [end_y], s=55, color="red")
+    ax_linear.scatter([min_row.distance_km], [min_y], s=70, facecolors="none", edgecolors="black", linewidths=1.1)
+    ax_linear.scatter([max_row.distance_km], [max_y], s=70, facecolors="none", edgecolors="black", linewidths=1.1)
+
+    def annotate_linear(label: str, x_value: float, y_value: float, *, x_offset: int = 8, y_offset: int = 0) -> None:
+        ax_linear.annotate(
+            label,
+            (x_value, y_value),
+            xytext=(x_offset, y_offset),
+            textcoords="offset points",
+            fontsize=8,
+            va="center",
+            bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "alpha": 0.92, "edgecolor": "0.7"},
+            arrowprops={"arrowstyle": "-", "color": "0.4", "lw": 0.8},
+        )
+
+    annotate_linear("Earth", 0.0, len(rows) / 2, x_offset=10, y_offset=14)
+    annotate_linear(f"Start\n{rows[0].day.isoformat()}", rows[0].distance_km, start_y, y_offset=14)
+    annotate_linear(f"End\n{rows[-1].day.isoformat()}", rows[-1].distance_km, end_y, y_offset=-14)
+    annotate_linear(f"Min\n{min_row.day.isoformat()}", min_row.distance_km, min_y, x_offset=-70, y_offset=-14)
+    annotate_linear(f"Max\n{max_row.day.isoformat()}", max_row.distance_km, max_y, x_offset=-70, y_offset=14)
+
+    tick_step = max(1, len(rows) // 8)
+    ax_linear.set_yticks(y_positions[::tick_step])
+    ax_linear.set_yticklabels([rows[index].day.isoformat() for index in y_positions[::tick_step]], fontsize=8)
+    ax_linear.set_title("Linear View: Earth Fixed, Moon Distance by Day")
+    ax_linear.set_xlabel("Distance from Earth (km)")
+    ax_linear.set_ylabel("Date")
+    ax_linear.grid(axis="x", alpha=0.35)
+    ax_linear.set_xlim(left=-max(distances) * 0.05)
+    ax_linear.invert_yaxis()
+
+    summary_text = (
+        f"Range: {rows[0].day.isoformat()} to {rows[-1].day.isoformat()}\n"
+        f"UTC time: {utc_time.strftime('%H:%M')}\n"
+        f"Minimum: {min_row.day.isoformat()} | {min_row.distance_km:,.1f} km\n"
+        f"Maximum: {max_row.day.isoformat()} | {max_row.distance_km:,.1f} km"
+    )
+    fig.text(
+        0.5,
+        0.01,
+        summary_text,
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.9, "edgecolor": "0.75"},
+    )
+
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
     fig.savefig(plot_output, dpi=150)
     plt.close(fig)
 
@@ -394,7 +440,7 @@ class DistanceGui:
                     if plot_path_text
                     else output_path.with_suffix(".png")
                 )
-                create_plot(rows, plot_output=plot_path, max_ticks=self.plot_tick_density.get())
+                create_plot(rows, plot_output=plot_path, utc_time=utc_time, max_ticks=self.plot_tick_density.get())
                 self._log(f"Plot saved: {plot_path}")
 
             min_row = min(rows, key=lambda item: item.distance_km)
@@ -437,7 +483,7 @@ def main() -> int:
                 if args.plot_output.strip()
                 else output_path.with_suffix(".png")
             )
-            create_plot(rows=rows, plot_output=plot_path)
+            create_plot(rows=rows, plot_output=plot_path, utc_time=utc_time)
             print(f"Plot saved: {plot_path}")
     except (argparse.ArgumentTypeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
