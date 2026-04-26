@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Run with: .venv/bin/python scripts/zip_compressor_gui.py
+# Run with: cd
 import os
 import threading
 import zipfile
