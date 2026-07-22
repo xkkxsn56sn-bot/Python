@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass, asdict
+import tkinter as tk
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Optional
 
 
@@ -181,8 +184,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Batch-convert Markdown files to PDF using Pandoc + xelatex with recursive directory scan and JSON reporting."
     )
-    p.add_argument("input_dir", help="Directory containing Markdown files")
-    p.add_argument("output_dir", help="Directory where PDFs and JSON report will be written")
+    p.add_argument("input_dir", nargs="?", default=str(Path.cwd()), help="Directory containing Markdown files")
+    p.add_argument("output_dir", nargs="?", default=str((Path.cwd() / "pdf-output").resolve()), help="Directory where PDFs and JSON report will be written")
     p.add_argument("--input-format", default="gfm", help="Pandoc input format (default: gfm)")
     p.add_argument("--pdf-engine", default="xelatex", help="Pandoc PDF engine (default: xelatex)")
     p.add_argument("--no-recursive", action="store_true", help="Do not scan subdirectories")
@@ -192,11 +195,144 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--metadata-file", type=Path, default=None, help="Optional Pandoc metadata YAML file")
     p.add_argument("--resource-path", type=Path, default=None, help="Optional resource path for images/includes")
     p.add_argument("--report-name", default="conversion-report.json", help="JSON report filename")
+    p.add_argument("--gui", action="store_true", help="Launch the desktop GUI")
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+
+    try:
+        report = convert_all(
+            input_dir=Path(args.input_dir),
+            output_dir=Path(args.output_dir),
+            input_format=args.input_format,
+            pdf_engine=args.pdf_engine,
+            overwrite=not args.no_overwrite,
+            recursive=not args.no_recursive,
+            toc=args.toc,
+            number_sections=args.number_sections,
+            metadata_file=args.metadata_file,
+            resource_path=args.resource_path,
+            report_name=args.report_name,
+        )
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    print(json.dumps(report["summary"], indent=2, ensure_ascii=False))
+    return 0
+
+
+class MarkdownToPDFGUI:
+    def __init__(self) -> None:
+        self.root = tk.Tk()
+        self.root.title("Markdown → PDF Batch")
+        self.root.geometry("900x620")
+        self.root.minsize(820, 560)
+
+        self.input_dir = tk.StringVar(value=str(Path.cwd()))
+        self.output_dir = tk.StringVar(value=str((Path.cwd() / "pdf-output").resolve()))
+        self.input_format = tk.StringVar(value="gfm")
+        self.pdf_engine = tk.StringVar(value="xelatex")
+        self.recursive = tk.BooleanVar(value=True)
+        self.overwrite = tk.BooleanVar(value=True)
+        self.toc = tk.BooleanVar(value=False)
+        self.number_sections = tk.BooleanVar(value=False)
+        self.report_name = tk.StringVar(value="conversion-report.json")
+        self.metadata_file = tk.StringVar(value="")
+        self.resource_path = tk.StringVar(value="")
+
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        main = ttk.Frame(self.root, padding=12)
+        main.pack(fill=tk.BOTH, expand=True)
+        main.columnconfigure(0, weight=1)
+        main.columnconfigure(1, weight=1)
+        main.columnconfigure(2, weight=1)
+        main.rowconfigure(9, weight=1)
+
+        ttk.Label(main, text="Input directory").grid(row=0, column=0, sticky="w")
+        ttk.Entry(main, textvariable=self.input_dir).grid(row=1, column=0, columnspan=2, sticky="ew", padx=(0, 8))
+        ttk.Button(main, text="Browse", command=self._pick_input).grid(row=1, column=2, sticky="ew")
+
+        ttk.Label(main, text="Output directory").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(main, textvariable=self.output_dir).grid(row=3, column=0, columnspan=2, sticky="ew", padx=(0, 8))
+        ttk.Button(main, text="Browse", command=self._pick_output).grid(row=3, column=2, sticky="ew")
+
+        ttk.Checkbutton(main, text="Scansiona ricorsivamente", variable=self.recursive).grid(row=4, column=0, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(main, text="Sovrascrivi PDF esistenti", variable=self.overwrite).grid(row=4, column=1, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(main, text="Aggiungi TOC", variable=self.toc).grid(row=4, column=2, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(main, text="Numerazione sezioni", variable=self.number_sections).grid(row=5, column=0, sticky="w", pady=(4, 0))
+
+        ttk.Label(main, text="Input format").grid(row=6, column=0, sticky="w", pady=(10, 0))
+        ttk.Entry(main, textvariable=self.input_format).grid(row=7, column=0, sticky="ew", padx=(0, 8))
+        ttk.Label(main, text="PDF engine").grid(row=6, column=1, sticky="w", pady=(10, 0))
+        ttk.Entry(main, textvariable=self.pdf_engine).grid(row=7, column=1, sticky="ew", padx=(0, 8))
+        ttk.Label(main, text="Report JSON").grid(row=6, column=2, sticky="w", pady=(10, 0))
+        ttk.Entry(main, textvariable=self.report_name).grid(row=7, column=2, sticky="ew")
+
+        ttk.Button(main, text="Run conversion", command=self._run).grid(row=8, column=0, columnspan=3, sticky="ew", pady=(12, 8))
+
+        self.log_text = scrolledtext.ScrolledText(main, height=16, state="disabled", wrap=tk.WORD)
+        self.log_text.grid(row=9, column=0, columnspan=3, sticky="nsew")
+
+    def _pick_input(self) -> None:
+        directory = filedialog.askdirectory(title="Select input directory")
+        if directory:
+            self.input_dir.set(directory)
+
+    def _pick_output(self) -> None:
+        directory = filedialog.askdirectory(title="Select output directory")
+        if directory:
+            self.output_dir.set(directory)
+
+    def _log(self, message: str) -> None:
+        self.log_text.configure(state="normal")
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.configure(state="disabled")
+
+    def _run(self) -> None:
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", tk.END)
+        self.log_text.configure(state="disabled")
+        self._log("Starting conversion...")
+        try:
+            report = convert_all(
+                input_dir=Path(self.input_dir.get().strip()),
+                output_dir=Path(self.output_dir.get().strip()),
+                input_format=self.input_format.get().strip(),
+                pdf_engine=self.pdf_engine.get().strip(),
+                overwrite=self.overwrite.get(),
+                recursive=self.recursive.get(),
+                toc=self.toc.get(),
+                number_sections=self.number_sections.get(),
+                metadata_file=Path(self.metadata_file.get().strip()).expanduser().resolve() if self.metadata_file.get().strip() else None,
+                resource_path=Path(self.resource_path.get().strip()).expanduser().resolve() if self.resource_path.get().strip() else None,
+                report_name=self.report_name.get().strip(),
+            )
+            self._log(json.dumps(report["summary"], indent=2, ensure_ascii=False))
+            messagebox.showinfo("Done", "Conversion completed")
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"ERROR: {exc}")
+            messagebox.showerror("Error", str(exc))
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
+def main() -> int:
+    if len(sys.argv) == 1:
+        MarkdownToPDFGUI().run()
+        return 0
+
+    args = parse_args()
+
+    if args.gui:
+        MarkdownToPDFGUI().run()
+        return 0
 
     try:
         report = convert_all(

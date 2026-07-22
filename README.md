@@ -1,6 +1,24 @@
 # Personal Python Scripts
 
-Questa cartella contiene script Python personali e un launcher unico (`main.py`) per eseguirli rapidamente.
+Questa cartella contiene script Python personali, un launcher CLI (`main.py`) e un launcher GUI centrale per avviarli rapidamente.
+
+## Quick Start
+
+Avvio rapido dei tool più usati:
+
+```bash
+# Apri il launcher GUI con tutti gli script
+python3 scripts/gui_launcher.py
+
+# Conversione Markdown -> PDF con GUI
+python3 scripts/md_to_pdf_batch.py --gui
+
+# Calcolo distanza Terra-Luna con GUI
+python3 scripts/earth_moon_distance_daily.py --gui
+
+# Renamer EPUB da titolo
+python3 scripts/epub_title_from_isbn.py
+```
 
 ## Setup veloce
 
@@ -12,20 +30,20 @@ Setup in un comando:
 
 Oppure manuale:
 
-1. Crea/attiva ambiente virtuale:
+Crea/attiva ambiente virtuale:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Installa dipendenze Python:
+Installa dipendenze Python:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Installa dipendenze di sistema (richieste da alcuni script):
+Installa dipendenze di sistema (richieste da alcuni script):
 
 ```bash
 brew install pandoc libreoffice
@@ -45,6 +63,23 @@ Esegui uno script tramite chiave:
 
 ```bash
 python main.py run md_to_pdf_batch -- --help
+```
+
+## Launcher GUI centrale
+
+Per aprire la schermata unificata con tutti gli script disponibili:
+
+```bash
+python3 scripts/gui_launcher.py
+```
+
+Oppure da terminale, se preferisci lanciare un singolo script con GUI:
+
+```bash
+python3 scripts/md_to_pdf_batch.py --gui
+python3 scripts/earth_moon_distance_daily.py --gui
+python3 scripts/epub_title_from_isbn.py
+python3 scripts/wps_to_markdown_complete.py
 ```
 
 Nuovo convertitore unificato verso PDF:
@@ -86,9 +121,11 @@ python main.py run to_pdf_converter_gui
 ```
 
 Note:
+
 - Le chiavi sono generate automaticamente dai nomi file in `scripts/`.
 - In alternativa puoi passare il nome file esatto (incluso `.py`).
 - Tutti gli argomenti dopo `--` vengono inoltrati allo script scelto.
+- `scripts/gui_launcher.py` fornisce un hub GUI con elenco degli script, ricerca e avvio da un’unica finestra.
 - `to_pdf_converter` supporta: `.docx`, `.wps`, `.epub`, `.txt`, `.rtf`, `.md`.
 - `to_pdf_converter_gui` fornisce una GUI Tkinter per scansione batch, opzioni di conversione, barra di avanzamento e log.
 - `earth_moon_distance_daily` calcola la distanza geocentrica Terra-Luna usando effemeridi JPL (`de421`) e salva un CSV giornaliero.
@@ -115,8 +152,8 @@ Uso:
 1. Apri Command Palette e avvia Run Task.
 2. Seleziona Python: List Personal Scripts per vedere le chiavi disponibili.
 3. Seleziona Python: Run Personal Script e inserisci:
-	- scriptKey: la chiave script mostrata dalla task list
-	- scriptArgs: argomenti opzionali (esempio: `--help`)
+   - scriptKey: la chiave script mostrata dalla task list
+   - scriptArgs: argomenti opzionali (esempio: `--help`)
 
 ## Changelog
 
